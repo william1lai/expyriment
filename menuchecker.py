@@ -38,14 +38,14 @@ class MyHTMLParser(HTMLParser):
                     self.text.append(data)
                 else:
                     if self.amp:
-	                self.text.append(data)
+                        self.text.append(data)
                         self.current.append("".join(self.text))
                         self.text = []
                         self.amp = False
                     elif self.text: #not empty and not ampersand
                         self.current.append("".join(self.text))
                         self.text = []
-	                self.text.append(data)
+                        self.text.append(data)
                     else:
                         self.text.append(data)
                     
@@ -62,7 +62,8 @@ def main():
     menu_url = "http://m.dining.ucla.edu/menu/index.cfm?r=De%20Neve,Hedrick%20Dining,Covel%20Dining,Feast%20at%20Rieber&restaurantType=Residential"
     aparser = argparse.ArgumentParser(description='''Find out how good the menu is today. BruinPlate not supported because it's not supported on the UCLA mobile dining page''')
     aparser.add_argument('-l', '--lunch', action='store_true')
-    aparser.add_argument('infile', nargs='?')
+    aparser.add_argument('menu', nargs='?')
+    aparser.add_argument('preferences', nargs='?')
 
     parser = MyHTMLParser()
     canopener = urllib.FancyURLopener({})
@@ -73,14 +74,27 @@ def main():
     else:
         menu_url = menu_url + "&m=Dinner"
 
-    print menu_url
-
-    if not args.infile:
+    if not args.menu:
         f = canopener.open(menu_url)
     else:
         f = open(args.infile, 'r')
     s = f.read()
     parser.feed(s)
+
+    if not args.preferences:
+        pf = open("menuchecker-preferences.txt", 'r')
+    else:
+        pf = open(args.preferences, 'r')
+    npeople = int(pf.readline().strip())
+    names = []
+    dislikes = []
+    likes = []
+    cares = []
+    for i in range(npeople):
+        names.append(pf.readline().strip())
+        dislikes.append(filter(None, [s.strip() for s in pf.readline().split(',')]))
+        likes.append(filter(None, [s.strip() for s in pf.readline().split(',')]))
+        cares.append(False)
 
     covel = '\n'.join(parser.coveldata)
     deneve = '\n'.join(parser.denevedata)
@@ -89,130 +103,64 @@ def main():
     print "\nDe Neve Menu:\n", deneve
     print "\nFeast Menu:\n", feast
 
-    edislikes = [ "mushroom", "shrimp", "seafood", "sushi" ]
-    elikes = [ "pho", "spaghetti", "tacos" ]
-    bdislikes = [ ]
-    blikes = [ "fish", "mahi", "baked potato", "shrimp" ]
-    wlikes = [ "potstickers", "sushi" ]
-    edec = False
-    bdec = False
-    wdec = False
+    nhalls = 3
     covelscore = 0
     denevescore = 0
     feastscore = 0
+    print ""
+
+    for z in range(nhalls): #covel = 0, de neve = 1, feast = 2
+        hallname = "Covel"
+        data = parser.coveldata
+        if z == 1:
+            hallname = "De Neve"
+            data = parser.denevedata
+        elif z == 2:
+            hallname = "Feast"
+            data = parser.feastdata
+        for item in data:
+            for i in range(len(names)):
+                person = names[i]
+                dislikelist = dislikes[i]
+                likelist = likes[i]
+
+                result = 0 #0 neutral, >0 like, <0 dislike
+                
+                for food in dislikelist:
+                    if food in str.lower(item):
+                        result = result - 15
+                for food in likelist:
+                    if food in str.lower(item):
+                        result = result + 10
+
+                if result < 0:
+                    print person, "won't like", hallname, "because of", item
+                    cares[i] = True                    
+                elif result > 0:
+                    print person, "will like", hallname, "because of", item
+                    cares[i] = True
+
+                if z == 0:
+                    covelscore = covelscore + result
+                elif z == 1:
+                    denevescore = denevescore + result
+                else: #z == 2
+                    feastscore = feastscore + result
+               
+    for i in range(len(names)):
+        if cares[i] == False:
+            print names[i], "doesn't care"
 
     print ""
-    for item in parser.coveldata:
-        for food in edislikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Eric won't like Covel because of", item
-                edec = True
-                covelscore = covelscore - 15
-    for item in parser.denevedata:
-        for food in edislikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Eric won't like De Neve because of", food
-                edec = True
-                denevescore = denevescore - 15
-    for item in parser.feastdata:
-        for food in edislikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Eric won't like Feast because of", food
-                edec = True
-                feastscore = feastscore - 15
-    for item in covel:
-        for food in elikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Eric will like Covel because of", food
-                edec = True
-                covelscore = covelscore + 10
-    for item in parser.denevedata:
-        for food in elikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Eric will like De Neve because of", food
-                edec = True
-                denevescore = denevescore + 10
-    for item in parser.feastdata:
-        for food in elikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Eric will like Feast because of", food
-                edec = True
-                feastscore = feastscore + 10
-
-    for item in parser.coveldata:
-        for food in bdislikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Brian won't like Covel because of", food
-                bdec = True
-                covelscore = covelscore - 15
-    for item in parser.denevedata:
-        for food in bdislikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Brian won't like De Neve because of", food
-                bdec = True
-                denevescore = denevescore - 15
-    for item in parser.feastdata:
-        for food in bdislikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Brian won't like Feast because of", food
-                bdec = True
-                feastscore = feastscore - 15
-    for item in parser.coveldata:
-        for food in blikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Brian will like Covel because of", food
-                bdec = True
-                covelscore = covelscore + 10
-    for item in parser.denevedata:
-        for food in blikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Brian will like De Neve because of", food
-                bdec = True
-                denevescore = denevescore + 10
-    for item in parser.feastdata:
-        for food in blikes:
-            if string.find(string.lower(item), food) != -1:
-                print "Brian will like Feast because of", food
-                bdec = True
-                feastscore = feastscore + 10
-
-    for item in parser.coveldata:
-        for food in wlikes:
-            if string.find(string.lower(item), food) != -1:
-                print "William will like Covel because of", food
-                wdec = True
-                covelscore = covelscore + 10
-    for item in parser.denevedata:
-        for food in wlikes:
-            if string.find(string.lower(item), food) != -1:
-                print "William will like De Neve because of", food
-                wdec = True
-                denevescore = denevescore + 10
-    for item in parser.feastdata:
-        for food in wlikes:
-            if string.find(string.lower(item), food) != -1:
-                print "William will like Feast because of", food
-                wdec = True
-                feastscore = feastscore + 10
-
-    if not edec:
-        print "Eric doesn't care"
-    if not bdec:
-        print "Brian doesn't care"
-    if not wdec:
-        print "William doesn't care"
-
-    print "Victor doesn't care\n"
-
     m = max(covelscore, denevescore, feastscore)
     if m < -20:
         print "This program recommends quick service.\n"
-    elif m == feastscore:
+    elif m == feastscore: #tiebreaker order
         print "This program recommends Feast.\n"
-    elif m == denevescore:
-        print "This program recommends De Neve.\n"
-    else:
+    elif m == covelscore:
         print "This program recommends Covel.\n"
+    else:
+        print "This program recommends De Neve.\n"
     raw_input() #to keep window open
 
 
