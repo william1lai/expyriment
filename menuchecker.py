@@ -23,15 +23,27 @@ class MyHTMLParser(HTMLParser):
                     self.isinTag = True
     def handle_endtag(self, tag):
         if tag == "div":
+            if self.text:
+                self.current.append("".join(self.text))
+                self.text = []
             self.isinTag = False
     def handle_data(self, data):
         if (re.search('[A-Za-z&]', data)) and self.isinTag:
             if data != "view full menu" and data != "vegetarian" and data != "vegan":
                 if data == "Covel Dining":
+                    if self.text:
+                        self.current.append("".join(self.text))
+                        self.text = []
                     self.current = self.coveldata
                 elif data == "De Neve":
+                    if self.text:
+                        self.current.append("".join(self.text))
+                        self.text = []
                     self.current = self.denevedata
                 elif data == "FEAST at Rieber":
+                    if self.text:
+                        self.current.append("".join(self.text))
+                        self.text = []
                     self.current = self.feastdata
                 elif data == "&":
                     self.amp = True
